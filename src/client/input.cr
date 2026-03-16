@@ -6,6 +6,9 @@
 # read_char_timeout(seconds) yields a key string if one is available
 # within the timeout, otherwise returns without yielding.
 #
+# Uses IO::FileDescriptor#read_timeout= (Crystal 1.19.1 API) to implement
+# polling without LibC.select or wait_readable.
+#
 # Known sequences returned:
 #   "\r"           Enter
 #   "\x7f"         Backspace
@@ -20,44 +23,40 @@
 #   Any printable  Single character string
 
 class Input
-  STDIN_FD = STDIN.fd
+  # STDIN is an IO::FileDescriptor (fd 0). We read from it directly.
+  # read_timeout= causes reads to raise IO::TimeoutError after the span elapses.
+  STDIN_IO = STDIN
 
   def read_char_timeout(timeout_sec : Float64, & : String ->)
-    return unless char_available?(timeout_sec)
-
-    first = read_byte
+    first = read_byte_timeout(timeout_sec)
     return unless first
 
     if first == 0x1b  # ESC -- start of escape sequence
       seq = String::Builder.new
       seq << '\e'
-      # Short wait for more bytes
-      if char_available?(0.05)
-        second = read_byte
-        if second
-          seq << second.chr
-          if second == '['.ord || second == 'O'.ord
-            # Read until we hit a terminator (letter or ~)
+
+      second = read_byte_timeout(0.05)
+      if second
+        seq << second.chr
+        if second == '['.ord || second == 'O'.ord
+          # Read until terminator (letter or ~)
+          loop do
+            b = read_byte_timeout(0.05)
+            break unless b
+            seq << b.chr
+            break if (b >= 'A'.ord && b <= 'Z'.ord) ||
+                     (b >= 'a'.ord && b <= 'z'.ord) ||
+                     b == '~'.ord
+          end
+        elsif second == 0x1b  # ESC ESC -- alt sequence
+          t = read_byte_timeout(0.05)
+          if t && t == '['.ord
+            seq << '['
             loop do
-              break unless char_available?(0.05)
-              b = read_byte
+              b = read_byte_timeout(0.05)
               break unless b
               seq << b.chr
-              break if (b >= 'A'.ord && b <= 'Z'.ord) || (b >= 'a'.ord && b <= 'z'.ord) || b == '~'.ord
-            end
-          elsif second == 0x1b  # ESC ESC -- alt sequence
-            if char_available?(0.05)
-              t = read_byte
-              if t && t == '['.ord
-                seq << '['
-                loop do
-                  break unless char_available?(0.05)
-                  b = read_byte
-                  break unless b
-                  seq << b.chr
-                  break if (b >= 'A'.ord && b <= 'Z'.ord) || b == '~'.ord
-                end
-              end
+              break if (b >= 'A'.ord && b <= 'Z'.ord) || b == '~'.ord
             end
           end
         end
@@ -68,23 +67,18 @@ class Input
     end
   end
 
-  private def char_available?(timeout : Float64) : Bool
-    fd_set = IO::FileDescriptor::FDSet.new
-    fd_set.set(STDIN_FD)
-    tv = LibC::Timeval.new
-    tv.tv_sec  = timeout.to_i
-    tv.tv_usec = ((timeout - timeout.to_i) * 1_000_000).to_i
-    ret = LibC.select(STDIN_FD + 1, pointerof(fd_set), nil, nil, pointerof(tv))
-    ret > 0
-  rescue
-    false
-  end
-
-  private def read_byte : UInt8?
-    buf = Bytes.new(1)
-    n = LibC.read(STDIN_FD, buf.to_unsafe, 1)
-    n > 0 ? buf[0] : nil
+  # Attempts to read one byte from STDIN within timeout_sec seconds.
+  # Returns nil on timeout or error.
+  private def read_byte_timeout(timeout_sec : Float64) : UInt8?
+    STDIN_IO.read_timeout = timeout_sec.seconds
+    byte = STDIN_IO.read_byte
+    byte
+  rescue IO::TimeoutError
+    nil
   rescue
     nil
+  ensure
+    # Reset timeout so normal reads don't time out unexpectedly
+    STDIN_IO.read_timeout = nil
   end
 end

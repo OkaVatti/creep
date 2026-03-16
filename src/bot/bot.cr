@@ -28,28 +28,28 @@ require "fast_irc"
 module Creep
   class Bot
     record BotEvent,
-      nick    : String,
-      user    : String,
-      host    : String,
-      target  : String,
-      body    : String,
+      nick : String,
+      user : String,
+      host : String,
+      target : String,
+      body : String,
       command : String?,
-      args    : String,
-      raw     : FastIRC::Message
+      args : String,
+      raw : FastIRC::Message
 
     alias Handler = Proc(BotEvent, Nil)
 
     getter nick : String
 
     def initialize(@cfg : Config::BotConfig)
-      @nick            = @cfg.nick
-      @privmsg_hooks   = [] of Handler
-      @notice_hooks    = [] of Handler
-      @join_hooks      = [] of Handler
-      @part_hooks      = [] of Handler
+      @nick = @cfg.nick
+      @privmsg_hooks = [] of Handler
+      @notice_hooks = [] of Handler
+      @join_hooks = [] of Handler
+      @part_hooks = [] of Handler
       @command_handlers = {} of String => Handler
-      @io              = IO::Memory.new.as(IO)  # replaced on connect
-      @connected       = false
+      @io = IO::Memory.new.as(IO) # replaced on connect
+      @connected = false
     end
 
     # ---- Registration ---------------------------------------------------
@@ -117,7 +117,7 @@ module Creep
       port : Int32,
       tls : Bool = false,
       proxy : String? = nil,
-      tls_verify : Bool = true
+      tls_verify : Bool = true,
     )
       @io = Transport.connect(host, port, tls: tls, proxy: proxy, tls_verify: tls_verify)
       @connected = true
@@ -132,18 +132,19 @@ module Creep
 
       while line = @io.gets(chomp: true)
         next if line.empty?
-        msg = FastIRC::Message.new(line)
+        msg = FastIRC.parse_line(line)
+        next unless msg
         case msg.command
         when "PING"
           nonce = msg.params[0]? || ""
           send_raw("PONG :#{nonce}")
-        when "001"  # RPL_WELCOME
+        when "001" # RPL_WELCOME
           unless registered
             registered = true
             @cfg.autojoin.each { |ch| join(ch) }
           end
         when "NICK"
-          if nick_from(msg.prefix?) == @nick
+          if nick_from(msg.prefix) == @nick
             @nick = msg.params[0]? || @nick
           end
         when "PRIVMSG"
@@ -163,31 +164,30 @@ module Creep
     # ---- Dispatch -------------------------------------------------------
 
     private def dispatch_privmsg(msg)
-      prefix = msg.prefix? || ""
-      parts  = prefix.split(/[!@]/)
-      nick   = parts[0]? || ""
-      user   = parts[1]? || ""
-      host   = parts[2]? || ""
+      p = msg.prefix
+      nick = p.try(&.nick) || ""
+      user = p.try(&.user) || ""
+      host = p.try(&.host) || ""
       target = msg.params[0]? || ""
-      body   = msg.params[1]? || ""
+      body = msg.params[1]? || ""
 
       cmd_name = nil
-      args     = ""
+      args = ""
       if body.starts_with?(@cfg.prefix)
-        words    = body[1..].split(" ", 2)
+        words = body[1..].split(" ", 2)
         cmd_name = words[0]?.try(&.downcase)
-        args     = words[1]? || ""
+        args = words[1]? || ""
       end
 
       event = BotEvent.new(
-        nick:    nick,
-        user:    user,
-        host:    host,
-        target:  target,
-        body:    body,
+        nick: nick,
+        user: user,
+        host: host,
+        target: target,
+        body: body,
         command: cmd_name,
-        args:    args,
-        raw:     msg
+        args: args,
+        raw: msg
       )
 
       forward_webhook(event)
@@ -210,23 +210,22 @@ module Creep
     end
 
     private def dispatch_generic(msg, hooks : Array(Handler))
-      prefix = msg.prefix? || ""
-      parts  = prefix.split(/[!@]/)
+      p = msg.prefix
       event = BotEvent.new(
-        nick:    parts[0]? || "",
-        user:    parts[1]? || "",
-        host:    parts[2]? || "",
-        target:  msg.params[0]? || "",
-        body:    msg.params[1]? || "",
+        nick: p.try(&.nick) || "",
+        user: p.try(&.user) || "",
+        host: p.try(&.host) || "",
+        target: msg.params[0]? || "",
+        body: msg.params[1]? || "",
         command: nil,
-        args:    "",
-        raw:     msg
+        args: "",
+        raw: msg
       )
       hooks.each { |h| h.call(event) rescue nil }
     end
 
-    private def nick_from(prefix : String?) : String
-      (prefix || "").split("!").first
+    private def nick_from(prefix : FastIRC::Prefix?) : String
+      prefix.to_s.split('!').first
     end
 
     # ---- Webhook --------------------------------------------------------

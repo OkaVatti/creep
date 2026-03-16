@@ -3,3 +3,9 @@
 /bin/
 /.shards/
 *.dwarf
+*.crt
+*.csr
+*.key
+*.san
+*.lock
+.editorconfig

@@ -521,7 +521,10 @@ module Creep
     private def self.handle_client(io : IO)
       @@lock.synchronize { @@clients[io] = Client.new(io) }
       begin
-        FastIRC.parse(io) do |msg|
+        while line = io.gets(chomp: true)
+          next if line.empty?
+          msg = FastIRC.parse_line(line)
+          next unless msg
           handle_message(io, msg)
         end
       rescue ex

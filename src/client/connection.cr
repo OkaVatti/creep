@@ -30,7 +30,8 @@ class IRCConnection
   def read_loop
     while line = @io.gets(chomp: true)
       next if line.empty?
-      msg = FastIRC::Message.new(line)
+      msg = FastIRC.parse_line(line)
+      next unless msg
       if msg.command == "PING"
         nonce = msg.params[0]? || ""
         send("PONG :#{nonce}")

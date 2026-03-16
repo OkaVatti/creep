@@ -29,10 +29,10 @@ require "./input"
 require "../common/markdown"
 
 struct Buffer
-  property name     : String
-  property lines    : Array(String) = [] of String
-  property unread   : Int32 = 0
-  property scroll   : Int32 = 0   # lines scrolled up from bottom (0 = follow tail)
+  property name : String
+  property lines : Array(String) = [] of String
+  property unread : Int32 = 0
+  property scroll : Int32 = 0 # lines scrolled up from bottom (0 = follow tail)
 
   def initialize(@name : String)
   end
@@ -56,14 +56,14 @@ class UI
   REST_C  = "\e[u"
 
   def initialize(@conn : IRCConnection, @nick : String, autojoin : Array(String) = [] of String)
-    @buffers     = [Buffer.new("*status*")] of Buffer
-    @active      = 0
-    @input_line  = ""
-    @cursor_pos  = 0
-    @incoming    = ::Channel(String).new(256)
-    @running     = true
-    @rows        = 24
-    @cols        = 80
+    @buffers = [Buffer.new("*status*")] of Buffer
+    @active = 0
+    @input_line = ""
+    @cursor_pos = 0
+    @incoming = ::Channel(String).new(256)
+    @running = true
+    @rows = 24
+    @cols = 80
     autojoin.each { |ch| @buffers << Buffer.new(ch) }
   end
 
@@ -142,7 +142,7 @@ class UI
   end
 
   private def render_tab_bar
-    print "\e[1;1H"   # row 1, col 1
+    print "\e[1;1H" # row 1, col 1
     bar = @buffers.each_with_index.map do |buf, i|
       badge = buf.unread > 0 ? "*" : ""
       if i == @active
@@ -156,7 +156,7 @@ class UI
   end
 
   private def render_messages
-    msg_rows = @rows - 3   # tab bar (1) + status bar (1) + input bar (1)
+    msg_rows = @rows - 3 # tab bar (1) + status bar (1) + input bar (1)
     return if msg_rows < 1
     buf = active_buf
     buf.unread = 0
@@ -203,28 +203,28 @@ class UI
     case ch
     when "\r", "\n"
       submit_input
-    when "\x7f", "\b"  # backspace
+    when "\x7f", "\b" # backspace
       if @cursor_pos > 0
         @input_line = @input_line[0, @cursor_pos - 1] + @input_line[@cursor_pos..]
         @cursor_pos -= 1
       end
-    when "\e[C"  # right arrow
+    when "\e[C" # right arrow
       @cursor_pos = [@cursor_pos + 1, @input_line.size].min
-    when "\e[D"  # left arrow
+    when "\e[D" # left arrow
       @cursor_pos = [@cursor_pos - 1, 0].max
-    when "\e[A"  # up arrow -- scroll up
+    when "\e[A" # up arrow -- scroll up
       active_buf.scroll += 1
       render_messages
-    when "\e[B"  # down arrow -- scroll down
+    when "\e[B" # down arrow -- scroll down
       active_buf.scroll = [active_buf.scroll - 1, 0].max
       render_messages
-    when "\e[1;5C", "\e\e[C"  # Alt+Right / Ctrl+Right -- next buffer
+    when "\e[1;5C", "\e\e[C" # Alt+Right / Ctrl+Right -- next buffer
       @active = (@active + 1) % @buffers.size
       render_full
-    when "\e[1;5D", "\e\e[D"  # Alt+Left / Ctrl+Left -- prev buffer
+    when "\e[1;5D", "\e\e[D" # Alt+Left / Ctrl+Left -- prev buffer
       @active = (@active - 1 + @buffers.size) % @buffers.size
       render_full
-    when "\x0c"  # Ctrl+L -- force redraw
+    when "\x0c" # Ctrl+L -- force redraw
       render_full
     else
       if ch.size == 1 && ch.bytes[0] >= 0x20
@@ -255,8 +255,8 @@ class UI
 
   private def handle_command(line : String)
     parts = line[1..].split(" ", 2)
-    cmd   = parts[0].downcase
-    args  = parts[1]? || ""
+    cmd = parts[0].downcase
+    args = parts[1]? || ""
 
     case cmd
     when "join"
@@ -351,9 +351,9 @@ class UI
     ts = Time.local.to_s("%H:%M")
     case msg.command
     when "PRIVMSG", "NOTICE"
-      sender = nick_from_prefix(msg.prefix? || "")
+      sender = prefix_nick(msg)
       target = msg.params[0]? || ""
-      body   = msg.params[1]? || ""
+      body = msg.params[1]? || ""
       # Route to appropriate buffer
       dest = target.starts_with?("#") ? target : sender
       route_to_buffer(dest)
@@ -361,29 +361,29 @@ class UI
       display_body = ctcp ? "* #{sender} #{$~[1]}" : "<#{sender}> #{Markdown.render_inline(body)}"
       "#{DIM}#{ts}#{RESET} #{display_body}"
     when "JOIN"
-      sender = nick_from_prefix(msg.prefix? || "")
+      sender = prefix_nick(msg)
       ch = msg.params[0]? || ""
       route_to_buffer(ch)
       "#{DIM}#{ts}#{RESET} #{DIM}--> #{sender} joined #{ch}#{RESET}"
     when "PART"
-      sender = nick_from_prefix(msg.prefix? || "")
+      sender = prefix_nick(msg)
       ch = msg.params[0]? || ""
       reason = msg.params[1]? || ""
       route_to_buffer(ch)
       "#{DIM}#{ts}#{RESET} #{DIM}<-- #{sender} left #{ch} (#{reason})#{RESET}"
     when "QUIT"
-      sender = nick_from_prefix(msg.prefix? || "")
+      sender = prefix_nick(msg)
       reason = msg.params[0]? || ""
       "#{DIM}#{ts}#{RESET} #{DIM}!-- #{sender} quit (#{reason})#{RESET}"
     when "NICK"
-      old_nick = nick_from_prefix(msg.prefix? || "")
+      old_nick = prefix_nick(msg)
       new_nick = msg.params[0]? || ""
       if old_nick == @nick
         @nick = new_nick
       end
       "#{DIM}#{ts}#{RESET} #{DIM}*** #{old_nick} is now known as #{new_nick}#{RESET}"
     when "TOPIC"
-      sender = nick_from_prefix(msg.prefix? || "")
+      sender = prefix_nick(msg)
       ch = msg.params[0]? || ""
       topic = msg.params[1]? || ""
       route_to_buffer(ch)
@@ -395,7 +395,7 @@ class UI
       when 1, 2, 3, 4, 372, 375, 376
         push_status_raw("#{DIM}#{ts}#{RESET} #{text}")
         ""
-      when 353  # NAMES
+      when 353 # NAMES
         ch = msg.params[2]? || ""
         nicks = msg.params[3]? || ""
         push_to_buffer(ch, "#{DIM}#{ts}#{RESET} #{DIM}[names #{ch}] #{nicks}#{RESET}")
@@ -414,8 +414,10 @@ class UI
     "#{DIM}#{ts}#{RESET} <#{@nick}> #{Markdown.render_inline(text)}"
   end
 
-  private def nick_from_prefix(prefix : String) : String
-    prefix.split("!").first
+  private def prefix_nick(msg : FastIRC::Message) : String
+    p = msg.prefix
+    return "" unless p
+    p.to_s.split('!').first
   end
 
   private def route_to_buffer(name : String)
