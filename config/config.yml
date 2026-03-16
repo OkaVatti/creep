@@ -38,14 +38,14 @@ server:
     # .onion address to 127.0.0.1:6668 via HiddenServicePort.
     # Clients connect via the SOCKS5 proxy in their client config.
     - host: "127.0.0.1"
-      port: 6668
+      port: 6678
       transport: "tcp"
       tls: false
 
     # I2P: bind to loopback; configure an I2P server tunnel
     # pointing at 127.0.0.1:6669 in your I2P router console.
     - host: "127.0.0.1"
-      port: 6669
+      port: 6679
       transport: "tcp"
       tls: false
 
