@@ -1,26 +1,18 @@
-# src/creepd.cr -- IRC server binary entry point
-#
-# Build:   shards build creepd
-# Run:     ./bin/creepd [--config path/to/config.yml]
+# src/creepd.cr -- IRC server daemon entry point
 
 require "./common/config"
 require "./server/server"
 
 config_path = "config/config.yml"
-if (idx = ARGV.index("--config"))
-  config_path = ARGV[idx + 1]? || config_path
+ARGV.each_with_index do |arg, i|
+  config_path = ARGV[i + 1] if arg == "--config" && ARGV[i + 1]?
 end
 
 begin
   cfg = Config.load(config_path)
 rescue ex
-  STDERR.puts "Failed to load config from #{config_path}: #{ex}"
+  STDERR.puts "Failed to load #{config_path}: #{ex}"
   exit 1
-end
-
-Signal::INT.trap do
-  puts "\n[creepd] shutting down"
-  exit 0
 end
 
 Creep::Server.start(cfg.server)

@@ -1,17 +1,8 @@
 # creep configuration
 # ---------------------------------------------------------------
-# server.listeners: each entry spawns its own TCP or TLS socket.
-#   transport: "tcp" | "tls"
-#   tls: true requires cert + key paths.
-#   proxy: optional SOCKS5 URL for outbound connections made by
-#          the server (e.g. linking to another server over Tor).
-#          For Tor use "socks5://127.0.0.1:9050"
-#          For I2P use "socks5://127.0.0.1:4447"
-#
-# client section drives the CLI client binary.
-#   proxy: SOCKS5 URL used for the client's outbound connection.
-#
-# bot section configures the built-in bot dispatcher.
+# Server section: defines the IRC server daemon (creepd).
+# Client section: defines the TUI client (creep).
+# Bot section: defines the embedded bot dispatcher.
 # ---------------------------------------------------------------
 
 server:
@@ -19,60 +10,76 @@ server:
   motd: |
     Welcome to creep IRC.
     This server supports Markdown formatting in messages.
+    Type /help in your client for a list of commands.
+  # Max nick length
+  max_nick_length: 30
+  # Max channel name length (excluding #)
+  max_channel_length: 50
+  # Max message length in bytes
+  max_message_length: 512
+  # Lines of history sent to joining clients (0 to disable)
+  history_lines: 50
+  # Ping clients every N seconds; disconnect after 2x this with no PONG
+  ping_interval: 60
+  # Path for structured JSON event log (null to disable)
+  log_file: null
+  # Operator credentials: /oper <name> <password>
+  opers:
+    - name: "admin"
+      password: "changeme"
   listeners:
-    # Plain TCP (ClearWeb or behind a reverse proxy)
+    # Plain TCP -- ClearWeb or behind a reverse proxy
     - host: "0.0.0.0"
       port: 6667
-      transport: "tcp"
       tls: false
-
-    # TLS (ClearWeb, direct SSL)
+    # TLS -- ClearWeb direct SSL
     - host: "0.0.0.0"
       port: 6697
-      transport: "tcp"
       tls: true
       cert: "config/server.crt"
       key:  "config/server.key"
-
-    # Tor hidden service: bind only to loopback; Tor maps the
-    # .onion address to 127.0.0.1:6668 via HiddenServicePort.
-    # Clients connect via the SOCKS5 proxy in their client config.
+    # Tor hidden service -- bind loopback; configure HiddenServicePort in torrc
+    # HiddenServicePort 6667 127.0.0.1:6678
     - host: "127.0.0.1"
       port: 6678
-      transport: "tcp"
       tls: false
-
-    # I2P: bind to loopback; configure an I2P server tunnel
-    # pointing at 127.0.0.1:6669 in your I2P router console.
+    # I2P -- bind loopback; create a server tunnel in I2P router console
     - host: "127.0.0.1"
       port: 6679
-      transport: "tcp"
       tls: false
 
 client:
-  # Remote server to connect to
-  server: "creep.local"
+  # Server to connect to on startup
+  server: "127.0.0.1"
   port: 6697
-  tls: true
-  # For Tor: "socks5://127.0.0.1:9050"
-  # For I2P: "socks5://127.0.0.1:4447"
+  tls: false
+  # Set tls_verify: false when using self-signed certificates
+  tls_verify: false
+  # Proxy for Tor:  "socks5://127.0.0.1:9050"
+  # Proxy for I2P:  "socks5://127.0.0.1:4447"
   proxy: null
   nick: "user"
   user: "user"
   realname: "creep user"
-  # Initial channels to auto-join on connect
+  # Channels to auto-join after connecting
   autojoin:
     - "#general"
+  # Enable Kitty terminal graphics protocol for /img command
+  kitty_graphics: true
+  # Max lines kept in each buffer's scrollback
+  scrollback: 500
+  # Timestamp format in message area
+  timestamp_format: "%H:%M"
+  # Theme: "default" or "minimal"
+  theme: "default"
 
 bot:
-  # nick the bot will register with
   nick: "creepbot"
   user: "creepbot"
   realname: "creep bot"
-  # channels the bot joins automatically
   autojoin:
     - "#general"
-  # Optional HTTP endpoint: POST events as JSON
+  # HTTP endpoint for webhook forwarding (null to disable)
   webhook_url: null
-  # Command prefix (e.g. "!" means "!help" triggers help handler)
+  # Command prefix character
   prefix: "!"
