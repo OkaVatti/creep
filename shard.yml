@@ -5,17 +5,16 @@ authors:
   - OkaVatti <okavatti@proton.me>
 
 targets:
+  creepd:
+    main: src/creepd.cr
   creep:
     main: src/creep.cr
 
-crystal: '>= 1.19.1'
+crystal: ">= 1.19.1"
 
 dependencies:
   fast_irc:
     github: RX14/fast_irc.cr
     version: 0.3.4
-  markd:
-    github: icyleaf/markd
-    version: ~> 0.5.0
 
 license: MIT
