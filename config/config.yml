@@ -1,0 +1,20 @@
+server:
+  name: "creep.local"
+  # Listeners: each entry creates its own listener (allows different certs/ports per listener).
+  listeners:
+    - host: "0.0.0.0"
+      port: 6667
+      transport: "tcp"
+      tls: false
+    - host: "0.0.0.0"
+      port: 6697
+      transport: "tcp"
+      tls: true
+      cert: "config/server.crt"
+      key: "config/server.key"
+  # Allowed transports (used by server logic if you want to restrict choices)
+  allowed_transports: ["tcp", "tls"]
+
+client:
+  proxy: null   # "socks5://127.0.0.1:9050" for Tor; or "socks5://127.0.0.1:4447" for I2P's SOCKS
+  tls: false
