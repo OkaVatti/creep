@@ -16,26 +16,18 @@ rescue ex
   exit 1
 end
 
-c = cfg.client
+# The UI manages its own connection lifecycle.
+# It starts in offline mode; the user connects via /connect or the config
+# auto-connects if a server is configured.
+ui = UI.new(cfg.client)
 
-STDERR.puts "Connecting to #{c.server}:#{c.port}#{c.tls ? " (TLS)" : ""}#{c.proxy ? " via #{c.proxy}" : ""}"
-
-begin
-  conn = IRCConnection.new(
-    host:       c.server,
-    port:       c.port,
-    tls:        c.tls,
-    proxy:      c.proxy,
-    tls_verify: c.tls_verify
-  )
-rescue ex
-  STDERR.puts "Connection failed: #{ex}"
-  exit 1
+# If the config has a server set, auto-connect on startup.
+# The UI will call do_connect internally after the screen is rendered,
+# so the user sees the interface before any network activity begins.
+unless cfg.client.server.empty?
+  # We signal the UI to connect by pre-populating the input and submitting,
+  # but since start() hasn't run yet we instead pass a flag via a method.
+  ui.autoconnect = true
 end
 
-conn.send("NICK #{c.nick}")
-conn.send("USER #{c.user} 0 * :#{c.realname}")
-c.autojoin.each { |ch| conn.send("JOIN #{ch}") }
-
-ui = UI.new(conn, cfg.client)
 ui.start

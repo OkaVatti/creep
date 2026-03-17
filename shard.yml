@@ -1,5 +1,5 @@
 name: creep
-version: 0.2.0
+version: 0.3.0
 
 authors:
   - OkaVatti <okavatti@proton.me>
@@ -16,5 +16,8 @@ dependencies:
   fast_irc:
     github: RX14/fast_irc.cr
     version: 0.3.4
+  sqlite3:
+    github: crystal-lang/crystal-sqlite3
+    version: ~> 0.21.0
 
 license: MIT

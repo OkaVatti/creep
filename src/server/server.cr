@@ -358,6 +358,12 @@ module Creep
         return
       end
 
+      # Creep sync/moderation relay -- intercept before normal routing
+      if target == "##creep-sync" && command == "NOTICE"
+        handle_creep_sync(io, client, body)
+        return
+      end
+
       line = ":#{client.prefix} #{command} #{target} :#{body}"
 
       if target.starts_with?("#")
@@ -507,6 +513,53 @@ module Creep
       end
       sign = adding ? "+" : "-"
       broadcast(ch, ":#{@@server_name} MODE #{ch.name} #{sign}#{mode_char} #{target_nick}")
+    end
+
+    # ---- CREEP sync/moderation protocol -----------------------------------
+    # NOTICE to ##creep-sync with payload "CREEP:{json}"
+    # Actions requiring Op+: delete, edit, suppress, unsuppress
+    # All clients subscribed to ##creep-sync receive the relayed payload.
+
+    private def self.handle_creep_sync(io : IO, client : Client, body : String)
+      return unless body.starts_with?("CREEP:")
+      json_str = body[6..]
+      begin
+        data = JSON.parse(json_str)
+        action = data["action"]?.try(&.as_s)
+        channel = data["channel"]?.try(&.as_s) || data["channel"].as_s
+
+        # Moderation actions require Op role in the target channel
+        if action && ["delete", "edit", "suppress", "unsuppress"].includes?(action)
+          chkey = channel.downcase
+          ch = @@channels[chkey]?
+          if ch && ch.role_of(client.nick) < Role::Op && !client.is_oper
+            numeric(io, 482, client.nick, "#{channel} :Moderation requires Op role or higher")
+            return
+          end
+        end
+
+        # Relay to all members of the target channel and ##creep-sync
+        relay_line = ":#{client.prefix} NOTICE ##creep-sync :CREEP:#{json_str}"
+
+        # Relay to ##creep-sync if it exists
+        if (sync_ch = @@channels["##creep-sync"]?)
+          broadcast(sync_ch, relay_line)
+        end
+
+        # Also relay to target channel as a server NOTICE for moderation actions
+        if action && ["delete", "edit", "suppress"].includes?(action)
+          chkey = channel.downcase
+          if (ch = @@channels[chkey]?)
+            mod_line = ":#{@@server_name} NOTICE #{channel} :CREEP:#{json_str}"
+            broadcast(ch, mod_line)
+          end
+        end
+
+        log_event("creep_#{action || "sync"}",
+          {"nick" => client.nick, "channel" => channel})
+      rescue ex
+        STDERR.puts "[server] creep sync error: #{ex}" if ENV["DEBUG"]?
+      end
     end
 
     # ---- KICK -----------------------------------------------------------

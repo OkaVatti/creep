@@ -1,4 +1,4 @@
-# src/common/config.cr -- typed config loader
+# src/common/config.cr
 
 require "yaml"
 
@@ -48,9 +48,11 @@ module Config
     getter scrollback       : Int32
     getter timestamp_format : String
     getter theme            : String
+    getter log_db           : String
+    getter sync_logs        : Bool
     def initialize(@server, @port, @tls, @tls_verify, @proxy, @nick, @user,
                    @realname, @autojoin, @kitty_graphics, @scrollback,
-                   @timestamp_format, @theme); end
+                   @timestamp_format, @theme, @log_db, @sync_logs); end
   end
 
   struct BotConfig
@@ -81,8 +83,8 @@ module Config
 
   private def self.i(v : YAML::Any, default = 0) : Int32
     case v.raw
-    when Int64   then v.raw.as(Int64).to_i32
-    when String  then v.raw.as(String).to_i32
+    when Int64  then v.raw.as(Int64).to_i32
+    when String then v.raw.as(String).to_i32
     else default
     end
   rescue
@@ -93,9 +95,9 @@ module Config
     case v.raw
     when Bool   then v.raw.as(Bool)
     when String
-      s = v.raw.as(String).downcase
-      return true  if s == "true"  || s == "yes" || s == "1"
-      return false if s == "false" || s == "no"  || s == "0"
+      s2 = v.raw.as(String).downcase
+      return true  if s2 == "true"  || s2 == "yes" || s2 == "1"
+      return false if s2 == "false" || s2 == "no"  || s2 == "0"
       default
     else default
     end
@@ -145,29 +147,31 @@ module Config
 
     autojoin_client = (cli["autojoin"]?.try(&.as_a) || [] of YAML::Any).map { |v| s(v) }
     client = ClientConfig.new(
-      server:           s(cli["server"]?  || YAML::Any.new("127.0.0.1")),
-      port:             i(cli["port"]?    || YAML::Any.new(6667_i64), 6667),
-      tls:              b(cli["tls"]?     || YAML::Any.new(false)),
+      server:           s(cli["server"]?   || YAML::Any.new("127.0.0.1")),
+      port:             i(cli["port"]?     || YAML::Any.new(6667_i64), 6667),
+      tls:              b(cli["tls"]?      || YAML::Any.new(false)),
       tls_verify:       b(cli["tls_verify"]? || YAML::Any.new(false), false),
       proxy:            sopt(cli["proxy"]?),
-      nick:             s(cli["nick"]?    || YAML::Any.new("user")),
-      user:             s(cli["user"]?    || YAML::Any.new("user")),
+      nick:             s(cli["nick"]?     || YAML::Any.new("user")),
+      user:             s(cli["user"]?     || YAML::Any.new("user")),
       realname:         s(cli["realname"]? || YAML::Any.new("creep user")),
       autojoin:         autojoin_client,
       kitty_graphics:   b(cli["kitty_graphics"]? || YAML::Any.new(true), true),
       scrollback:       i(cli["scrollback"]?     || YAML::Any.new(500_i64), 500),
       timestamp_format: s(cli["timestamp_format"]? || YAML::Any.new("%H:%M")),
-      theme:            s(cli["theme"]?            || YAML::Any.new("default"))
+      theme:            s(cli["theme"]?            || YAML::Any.new("default")),
+      log_db:           s(cli["log_db"]?           || YAML::Any.new("data/logs.db")),
+      sync_logs:        b(cli["sync_logs"]?        || YAML::Any.new(true), true)
     )
 
     autojoin_bot = (bot["autojoin"]?.try(&.as_a) || [] of YAML::Any).map { |v| s(v) }
     bot_cfg = BotConfig.new(
-      nick:        s(bot["nick"]?        || YAML::Any.new("creepbot")),
-      user:        s(bot["user"]?        || YAML::Any.new("creepbot")),
-      realname:    s(bot["realname"]?    || YAML::Any.new("creep bot")),
+      nick:        s(bot["nick"]?     || YAML::Any.new("creepbot")),
+      user:        s(bot["user"]?     || YAML::Any.new("creepbot")),
+      realname:    s(bot["realname"]? || YAML::Any.new("creep bot")),
       autojoin:    autojoin_bot,
       webhook_url: sopt(bot["webhook_url"]?),
-      prefix:      s(bot["prefix"]?      || YAML::Any.new("!"))
+      prefix:      s(bot["prefix"]?   || YAML::Any.new("!"))
     )
 
     AppConfig.new(server: server, client: client, bot: bot_cfg)

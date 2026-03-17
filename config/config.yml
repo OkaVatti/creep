@@ -1,9 +1,4 @@
-# creep configuration
-# ---------------------------------------------------------------
-# Server section: defines the IRC server daemon (creepd).
-# Client section: defines the TUI client (creep).
-# Bot section: defines the embedded bot dispatcher.
-# ---------------------------------------------------------------
+# creep configuration v0.3.0
 
 server:
   name: "creep.local"
@@ -11,67 +6,52 @@ server:
     Welcome to creep IRC.
     This server supports Markdown formatting in messages.
     Type /help in your client for a list of commands.
-  # Max nick length
   max_nick_length: 30
-  # Max channel name length (excluding #)
   max_channel_length: 50
-  # Max message length in bytes
   max_message_length: 512
-  # Lines of history sent to joining clients (0 to disable)
   history_lines: 50
-  # Ping clients every N seconds; disconnect after 2x this with no PONG
   ping_interval: 60
-  # Path for structured JSON event log (null to disable)
   log_file: null
-  # Operator credentials: /oper <name> <password>
   opers:
     - name: "admin"
       password: "changeme"
   listeners:
-    # Plain TCP -- ClearWeb or behind a reverse proxy
     - host: "0.0.0.0"
-      port: 6667
+      port: 6677
       tls: false
-    # TLS -- ClearWeb direct SSL
     - host: "0.0.0.0"
       port: 6697
       tls: true
       cert: "config/server.crt"
       key:  "config/server.key"
-    # Tor hidden service -- bind loopback; configure HiddenServicePort in torrc
-    # HiddenServicePort 6667 127.0.0.1:6678
     - host: "127.0.0.1"
       port: 6678
       tls: false
-    # I2P -- bind loopback; create a server tunnel in I2P router console
     - host: "127.0.0.1"
       port: 6679
       tls: false
 
 client:
-  # Server to connect to on startup
+  # Use port 6667 (plain TCP) for local testing.
+  # Change to 6697 + tls: true for encrypted.
   server: "127.0.0.1"
-  port: 6697
+  port: 6677
   tls: false
-  # Set tls_verify: false when using self-signed certificates
   tls_verify: false
-  # Proxy for Tor:  "socks5://127.0.0.1:9050"
-  # Proxy for I2P:  "socks5://127.0.0.1:4447"
   proxy: null
   nick: "user"
   user: "user"
   realname: "creep user"
-  # Channels to auto-join after connecting
   autojoin:
     - "#general"
-  # Enable Kitty terminal graphics protocol for /img command
   kitty_graphics: true
-  # Max lines kept in each buffer's scrollback
   scrollback: 500
-  # Timestamp format in message area
   timestamp_format: "%H:%M"
-  # Theme: "default" or "minimal"
   theme: "default"
+  # Local chat log database path (SQLite)
+  log_db: "data/logs.db"
+  # Sync chat logs with server on connect
+  sync_logs: true
 
 bot:
   nick: "creepbot"
@@ -79,7 +59,5 @@ bot:
   realname: "creep bot"
   autojoin:
     - "#general"
-  # HTTP endpoint for webhook forwarding (null to disable)
   webhook_url: null
-  # Command prefix character
   prefix: "!"
